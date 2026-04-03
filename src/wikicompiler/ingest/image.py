@@ -31,9 +31,24 @@ def download_images(
             response = requests.get(url, timeout=15, stream=True)
             response.raise_for_status()
 
+            # Enforce max file size (10 MB) to prevent abuse
+            max_size = 10 * 1024 * 1024
+            size = 0
             with open(local_path, "wb") as f:
                 for chunk in response.iter_content(chunk_size=8192):
+                    size += len(chunk)
+                    if size > max_size:
+                        break
                     f.write(chunk)
+
+            if size > max_size:
+                local_path.unlink(missing_ok=True)
+                continue
+
+            # Validate the file is actually an image (check magic bytes)
+            if not _is_valid_image_file(local_path):
+                local_path.unlink(missing_ok=True)
+                continue
 
             # Relative path from vault root
             rel_path = f"{ASSETS_DIR}/{doc_slug}/{filename}"
@@ -52,6 +67,36 @@ def rewrite_image_urls(markdown: str, url_map: dict[str, str]) -> str:
         # Replace in markdown image syntax ![alt](url)
         markdown = markdown.replace(original_url, local_path)
     return markdown
+
+
+def _is_valid_image_file(path: Path) -> bool:
+    """Check if a file is a valid image by inspecting magic bytes."""
+    try:
+        header = path.read_bytes()[:16]
+    except OSError:
+        return False
+
+    # PNG: \x89PNG\r\n\x1a\n
+    if header[:8] == b"\x89PNG\r\n\x1a\n":
+        return True
+    # JPEG: \xff\xd8\xff
+    if header[:3] == b"\xff\xd8\xff":
+        return True
+    # GIF: GIF87a or GIF89a
+    if header[:6] in (b"GIF87a", b"GIF89a"):
+        return True
+    # WebP: RIFF....WEBP
+    if header[:4] == b"RIFF" and header[8:12] == b"WEBP":
+        return True
+    # SVG: starts with < (XML-based, check for svg tag)
+    if header.lstrip()[:1] == b"<":
+        # Read more to find <svg
+        try:
+            text = path.read_text(encoding="utf-8", errors="ignore")[:500]
+            return "<svg" in text.lower()
+        except OSError:
+            return False
+    return False
 
 
 def _url_to_filename(url: str, index: int) -> str:

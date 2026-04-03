@@ -81,6 +81,25 @@ VAULT_TOOLS = [
 ]
 
 
+# Allowed file extensions for LLM write operations
+_WRITE_ALLOWED_EXTENSIONS = {".md", ".yaml", ".yml", ".txt", ".json", ".toml"}
+
+
+def _validate_rel_path(rel_path: str) -> None:
+    """Validate a relative path from LLM tool input.
+
+    Rejects absolute paths, path traversal attempts, and null bytes.
+    """
+    if not rel_path:
+        raise ValueError("Empty path")
+    if "\x00" in rel_path:
+        raise ValueError("Null byte in path")
+    if rel_path.startswith("/"):
+        raise ValueError("Absolute paths are not allowed")
+    if ".." in rel_path.split("/"):
+        raise ValueError("Path traversal ('..') is not allowed")
+
+
 class ToolHandler:
     """Executes tool calls from the LLM against the vault filesystem."""
 
@@ -106,6 +125,7 @@ class ToolHandler:
             return f"Error: {e}"
 
     def _read_file(self, rel_path: str) -> str:
+        _validate_rel_path(rel_path)
         target = self.vault_root / rel_path
         ensure_within_vault(self.vault_root, target)
         if not target.exists():
@@ -113,10 +133,16 @@ class ToolHandler:
         return target.read_text(encoding="utf-8")
 
     def _write_file(self, rel_path: str, content: str) -> str:
+        _validate_rel_path(rel_path)
+        # Restrict writable file types
+        ext = Path(rel_path).suffix.lower()
+        if ext and ext not in _WRITE_ALLOWED_EXTENSIONS:
+            return f"Error: Cannot write files with extension '{ext}'. Allowed: {_WRITE_ALLOWED_EXTENSIONS}"
         safe_write(self.vault_root, rel_path, content)
         return f"Successfully wrote {rel_path}"
 
     def _list_dir(self, rel_path: str) -> str:
+        _validate_rel_path(rel_path)
         target = self.vault_root / rel_path
         ensure_within_vault(self.vault_root, target)
         if not target.is_dir():

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from markupsafe import Markup, escape
 from flask import Flask, request, render_template_string
 
 from .engine import search

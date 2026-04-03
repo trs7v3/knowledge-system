@@ -12,11 +12,21 @@ vault/.obsidian/workspace.json
 vault/.obsidian/workspace-mobile.json
 vault/.search_index/
 
-# Environment
+# Environment and secrets
 .env
+.env.*
 .venv/
 env/
 venv/
+*.key
+*.pem
+*.cert
+*.p12
+credentials.json
+auth.json
+secrets.yaml
+secrets.yml
+.credentials/
 
 # IDE
 .idea/

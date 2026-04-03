@@ -48,6 +48,40 @@ def test_safe_write_rejects_outside_vault(tmp_vault: Path):
         safe_write(tmp_vault, "../escape.md", "malicious")
 
 
+def test_path_traversal_prefix_bypass(tmp_path: Path):
+    """Ensure /vault-evil is not treated as inside /vault."""
+    from wikicompiler.vault.paths import ensure_within_vault
+
+    vault = tmp_path / "vault"
+    vault.mkdir()
+    evil = tmp_path / "vault-evil"
+    evil.mkdir()
+    target = evil / "secret.txt"
+    target.write_text("secret")
+
+    with pytest.raises(ValueError, match="outside vault"):
+        ensure_within_vault(vault, target)
+
+
+def test_tool_handler_rejects_traversal(tmp_vault: Path):
+    """Ensure LLM tools cannot escape the vault."""
+    from wikicompiler.llm.tools import ToolHandler
+
+    handler = ToolHandler(tmp_vault)
+
+    result = handler.handle("read_file", {"path": "../../etc/passwd"})
+    assert "Error" in result
+
+    result = handler.handle("write_file", {"path": "../evil.md", "content": "bad"})
+    assert "Error" in result
+
+    result = handler.handle("read_file", {"path": "/etc/passwd"})
+    assert "Error" in result
+
+    result = handler.handle("write_file", {"path": "test.sh", "content": "#!/bin/bash"})
+    assert "Error" in result  # .sh not in allowed extensions
+
+
 def test_frontmatter_roundtrip(tmp_vault: Path):
     from wikicompiler.vault.frontmatter import write_frontmatter, read_frontmatter
 

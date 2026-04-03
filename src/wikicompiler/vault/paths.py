@@ -51,10 +51,16 @@ def resolve_vault(vault_path: str | Path | None = None) -> Path:
 
 
 def ensure_within_vault(vault_root: Path, target: Path) -> Path:
-    """Validate that target path is within the vault. Raises ValueError if not."""
+    """Validate that target path is within the vault. Raises ValueError if not.
+
+    Uses Path.relative_to() for safe containment checking — immune to
+    prefix-based bypasses like /vault vs /vault-evil.
+    """
     resolved = target.resolve()
     vault_resolved = vault_root.resolve()
-    if not str(resolved).startswith(str(vault_resolved)):
+    try:
+        resolved.relative_to(vault_resolved)
+    except ValueError:
         raise ValueError(
             f"Path {resolved} is outside vault root {vault_resolved}"
         )

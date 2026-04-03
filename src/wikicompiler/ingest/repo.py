@@ -2,9 +2,27 @@
 
 from __future__ import annotations
 
+import re
 import subprocess
 import tempfile
 from pathlib import Path
+from urllib.parse import urlparse
+
+# Allow HTTPS, SSH, and git:// URLs only
+_VALID_REPO_URL = re.compile(
+    r"^(https?://[a-zA-Z0-9\-._~:/?#\[\]@!$&'()*+,;=%]+|"
+    r"git@[a-zA-Z0-9\-._]+:[a-zA-Z0-9\-._/]+\.git|"
+    r"git://[a-zA-Z0-9\-._~:/?#\[\]@!$&'()*+,;=%]+)$"
+)
+
+
+def _validate_repo_url(url: str) -> None:
+    """Validate that a repository URL is safe to clone."""
+    if not _VALID_REPO_URL.match(url):
+        raise ValueError(f"Invalid or unsafe repository URL: {url}")
+    parsed = urlparse(url)
+    if parsed.scheme and parsed.scheme not in ("https", "http", "git", "ssh"):
+        raise ValueError(f"Unsupported URL scheme: {parsed.scheme}")
 
 
 def summarize_repo(repo_url: str) -> tuple[str, str]:
@@ -13,16 +31,20 @@ def summarize_repo(repo_url: str) -> tuple[str, str]:
     Returns:
         (title, markdown_content)
     """
+    _validate_repo_url(repo_url)
+
     with tempfile.TemporaryDirectory() as tmpdir:
         clone_dir = Path(tmpdir) / "repo"
 
-        # Shallow clone
+        # Shallow clone with no interactive prompts
+        env = {"GIT_TERMINAL_PROMPT": "0"}
         subprocess.run(
             ["git", "clone", "--depth", "1", repo_url, str(clone_dir)],
             capture_output=True,
             text=True,
             timeout=120,
             check=True,
+            env=env,
         )
 
         # Extract repo name
