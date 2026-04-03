@@ -2,6 +2,8 @@
 
 An LLM-powered knowledge management system that ingests raw documents, compiles them into an Obsidian-compatible wiki, and provides Q&A, search, and linting capabilities. The LLM maintains the wiki — you rarely edit it directly.
 
+Inspired by [Andrej Karpathy's tweet](https://x.com/karpathy/status/2039805659525644595?s=20) describing his workflow of using an LLM to compile raw sources into an Obsidian wiki, then querying and linting it incrementally. This project is an implementation of that vision as a proper CLI tool.
+
 ## How It Works
 
 ```
