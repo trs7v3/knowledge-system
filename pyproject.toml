@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "wikicompiler"
+version = "0.1.0"
+description = "LLM-powered wiki compiler: ingest raw documents, compile into an Obsidian-compatible wiki, query, lint, and search."
+requires-python = ">=3.10"
+dependencies = [
+    "click>=8.1",
+    "anthropic>=0.40",
+    "python-frontmatter>=1.1",
+    "pyyaml>=6.0",
+    "requests>=2.31",
+    "beautifulsoup4>=4.12",
+    "markdownify>=0.13",
+    "pdfplumber>=0.11",
+    "whoosh>=2.7",
+    "flask>=3.0",
+    "rich>=13.7",
+    "matplotlib>=3.8",
+    "pillow>=10.2",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=4.0",
+]
+
+[project.scripts]
+wiki = "wikicompiler.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
