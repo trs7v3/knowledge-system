@@ -113,8 +113,48 @@ def _get_work_list(
                 continue
         return docs
 
-    # Incremental: only unprocessed documents
-    return get_unprocessed_docs(vault_root)
+    # Incremental: unprocessed documents from index + untracked files on disk
+    unprocessed = get_unprocessed_docs(vault_root)
+
+    # Also discover raw .md files not tracked in the index at all
+    # (e.g. dropped in by Obsidian Web Clipper or manual copy)
+    from ..vault.paths import RAW_DIR
+    from ..ingest.metadata import update_raw_index, create_raw_metadata
+
+    raw_dir = vault_root / RAW_DIR
+    if raw_dir.exists():
+        indexed_paths = {d["path"] for d in unprocessed}
+        # Also get compiled paths so we don't re-add them
+        index_path = vault_root / "raw/_index.md"
+        all_indexed_paths = set()
+        if index_path.exists():
+            idx_meta, _ = read_frontmatter(index_path)
+            all_indexed_paths = {d["path"] for d in idx_meta.get("documents", [])}
+
+        for md_file in raw_dir.rglob("*.md"):
+            if md_file.name.startswith("_"):
+                continue
+            rel_path = str(md_file.relative_to(vault_root))
+            if rel_path not in all_indexed_paths:
+                # Auto-register this untracked file
+                try:
+                    meta, content = read_frontmatter(md_file)
+                except Exception:
+                    content = md_file.read_text(encoding="utf-8")
+                    meta = {}
+
+                if meta.get("status") != "compiled":
+                    title = meta.get("title", md_file.stem.replace("-", " ").title())
+                    reg_meta = create_raw_metadata(
+                        source_type=meta.get("source_type", "markdown"),
+                        title=title,
+                        content=content,
+                    )
+                    update_raw_index(vault_root, rel_path, reg_meta)
+                    unprocessed.append({"path": rel_path, **reg_meta})
+                    info(f"Auto-registered untracked file: {rel_path}")
+
+    return unprocessed
 
 
 def _compile_document(
